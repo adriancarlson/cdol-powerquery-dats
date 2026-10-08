@@ -1,0 +1,191 @@
+<queries>
+    <query name="net.cdolinc.custom.dats.students.contacts" flattened="true" coreTable="Students" dat="true">
+        <summary>DAT - Contacts for a student</summary>
+        <description>PowerQuery DAT to return all active contacts for a student, inactive contact details or end-date contact details are excluded.modified from Mike Gerszewski's one on PowerSchool Exchange</description>
+        <args>
+            <arg name="coretabledcid" column="Students.DCID" required="true" />
+            <arg name="linesep" column="codeset.code" casing="lower" required="false" default="br" />
+        </args>
+        <columns>
+            <column column="students.lastfirst">Name</column>
+            <column column="codeset.code">Relationship</column>
+            <column column="phonenumber.phonenumber">Phones</column>
+            <column column="personaddress.street">Addresses</column>
+            <column column="studentcontactdetail.relationshipnote">Flags</column>
+        </columns>
+        <sql><![CDATA[
+            select
+                    chr(60) || 'span style="font-weight: bold;"' || chr(62) || p.firstname || ' ' || p.LASTNAME ||  chr(60) || '/span' || chr(62) || case when personemails.emails is not null then incolumnsep.sep || personemails.emails else '' end Name
+                    , crcs.code Relationship
+                    , personphones.phones
+                    , personaddr.addresses
+                    , case when scd.ISCUSTODIAL=1 then '✔️' else '❌' end || ' Custodial' || incolumnsep.sep ||
+                        case when scd.LIVESWITHFLG=1 then '✔️' else '❌' end || ' Lives With Student' || incolumnsep.sep ||
+                        case when scd.SCHOOLPICKUPFLG=1 then '✔️' else '❌' end || ' School Pickup' || incolumnsep.sep ||
+                        case when scd.ISEMERGENCY=1 then '✔️' else '❌' end || ' Emergency' || incolumnsep.sep ||
+                        case when scd.RECEIVESMAILFLG=1 then '✔️' else '❌' end ||' Mailings' || incolumnsep.sep
+                        flags
+                    from students students
+                    INNER JOIN
+                        studentContactAssoc sca ON students.dcid = sca.studentdcid
+                    INNER JOIN
+                        studentContactDetail scd ON sca.studentcontactassocid = scd.studentcontactassocid
+                        AND scd.isactive = 1
+                        AND sysdate            <= coalesce(scd.ENDDATE, sysdate)
+                    INNER JOIN
+                        /*(select person.ID, person.ISACTIVE, person.FIRSTNAME, person.LASTNAME, person.PREFIXCODESETID, person.SUFFIXCODESETID, person.GENDERCODESETID from person person) p*/
+                        (SELECT contactpersonid id, isactive, contactfirstname firstname, contactlastname lastname, prefixcodesetid, suffixcodesetid, gendercodesetid, studentdcid from PSSIS_STU_CONTACT_ACT psca) p
+                            ON sca.personid = p.id
+                            AND p.studentdcid = students.dcid
+                        AND p.ISACTIVE = 1
+                    INNER JOIN
+                        codeset rcs ON scd.relationshiptypecodesetid = rcs.codesetid
+                    inner join (
+                        select case when 'br' = 'br' then chr(60) || 'br' || chr(62)
+                            else null end sep
+                        from dual
+                    ) incolumnsep on 1=1
+                    left join
+                        (select personid
+                        , listagg(emailwtype, sep) emails
+                        from(
+                            select
+                            personemailaddressassoc.PERSONID
+                            , emailaddress.emailaddress emailwtype
+                            , incolumnsep.sep
+                            from emailaddress
+                            inner join PERSONEMAILADDRESSASSOC on emailaddress.EMAILADDRESSID = PERSONEMAILADDRESSASSOC.EMAILADDRESSID
+                            inner join codeset on PERSONEMAILADDRESSASSOC.EMAILTYPECODESETID = codeset.CODESETID
+                            inner join (
+                                select case when 'br' = 'br' then chr(60) || 'br' || chr(62)
+                                    else '' end sep
+                                from dual
+                            ) incolumnsep on 1=1
+                            order by PERSONEMAILADDRESSASSOC.EMAILADDRESSPRIORITYORDER
+                        )
+                        group by PERSONID, sep
+                    ) personemails
+                    on personemails.personid = p.id
+                    left join
+                        (select personid
+                            , listagg(phonewtype, sep) phones
+                        from (
+                            select
+                                PERSONPHONENUMBERASSOC.PERSONID
+                            , (
+                                    CASE
+                                        WHEN REGEXP_LIKE(TRIM(TO_CHAR(phonenumber.PHONENUMBER)), '^1\d{10}$')
+                                        THEN REGEXP_REPLACE(
+                                                TRIM(TO_CHAR(phonenumber.PHONENUMBER)),
+                                                '^1(\d{3})(\d{3})(\d{4})$',
+                                                '1-\1-\2-\3'
+                                            )
+                                        WHEN REGEXP_LIKE(TRIM(TO_CHAR(phonenumber.PHONENUMBER)), '^\d{10}$')
+                                        THEN REGEXP_REPLACE(
+                                                TRIM(TO_CHAR(phonenumber.PHONENUMBER)),
+                                                '^(\d{3})(\d{3})(\d{4})$',
+                                                '\1-\2-\3'
+                                            )
+                                        ELSE TRIM(TO_CHAR(phonenumber.PHONENUMBER))
+                                    END
+                                ) || ' (' || COALESCE(codeset.DISPLAYVALUE, codeset.CODE, '') || ')' AS phonewtype
+                            , incolumnsep.sep
+                            from PHONENUMBER
+                            inner join PERSONPHONENUMBERASSOC
+                                on PHONENUMBER.PHONENUMBERID = PERSONPHONENUMBERASSOC.PHONENUMBERID
+                            inner join codeset
+                                on PERSONPHONENUMBERASSOC.PHONETYPECODESETID = codeset.CODESETID
+                            inner join (
+                                select case when 'br' = 'br' then chr(60) || 'br' || chr(62)
+                                            else '' end sep
+                                from dual
+                            ) incolumnsep on 1=1
+                            order by PERSONPHONENUMBERASSOC.PHONENUMBERPRIORITYORDER
+                        )
+                        group by PERSONID, sep
+                    ) personphones
+                    on personphones.personid = p.id
+                    left join
+                        (select personid
+                        , listagg(addrwtype, sep) addresses
+                        from(
+                            select
+                            PERSONADDRESSASSOC.PERSONID
+                            , case when length(codeset.code)> 0 then chr(60) || 'span style="font-weight: bold;"' || chr(62) || codeset.CODE || ':' || chr(60) || '/span' || chr(62) || incolumnsep.sep else '' end ||
+                                personaddress.STREET || case when length(personaddress.unit) > 0 then ' Apt ' || personaddress.unit else '' end ||
+                                incolumnsep.sep ||
+                                case when length(personaddress.LINETWO) > 0 then personaddress.LINETWO || incolumnsep.sep else '' end ||
+                                personaddress.CITY || ', ' || states.code || ' ' || personaddress.POSTALCODE addrwtype
+                            , incolumnsep.sep || incolumnsep.sep sep
+                            from PERSONADDRESS
+                            inner join PERSONADDRESSASSOC on PERSONADDRESS.PERSONADDRESSID = PERSONADDRESSASSOC.PERSONADDRESSID
+                                AND sysdate <= coalesce(PERSONADDRESSASSOC.ENDDATE, sysdate)
+                            inner join codeset on PERSONADDRESSASSOC.ADDRESSTYPECODESETID = codeset.CODESETID
+                            left join codeset states on personaddress.STATESCODESETID = states.CODESETID
+                            inner join (
+                                select case when 'br' = 'br' then chr(60) || 'br' || chr(62)
+                                    else '' end sep
+                                from dual
+                            ) incolumnsep on 1=1
+                            order by PERSONADDRESSASSOC.ADDRESSPRIORITYORDER
+                        )
+                        group by PERSONID, sep
+                    ) personaddr
+                    on personaddr.personid = p.id
+                    LEFT JOIN
+                        codeset crcs ON sca.currreltypecodesetid = crcs.codesetid
+                    LEFT JOIN
+                        codeset pcs ON p.prefixcodesetid = pcs.codesetid
+                    LEFT JOIN
+                        codeset scs ON p.suffixcodesetid = scs.codesetid
+                    LEFT JOIN
+                        codeset gcs ON p.gendercodesetid = gcs.codesetid
+                    where
+                    students.dcid = :coretabledcid
+                    order by sca.CONTACTPRIORITYORDER
+      ]]>        </sql>
+    </query>
+    <query name="net.cdolinc.student.sat.satdate" flattened="true" coreTable="Students" dat="true">
+        <summary>DAT - SAT Date</summary>
+        <description>List Date of SAT day for Current Term</description>
+        <args>
+            <arg name="coretabledcid" column="Students.DCID" required="true" />
+        </args>
+        <columns>
+            <column column="Students.entrydate">entrydate</column>
+        </columns>
+        <sql><![CDATA[
+            WITH latest_term AS (
+					SELECT firstday, lastday
+					FROM terms
+					WHERE schoolid = 160
+						AND TRUNC(SYSDATE) BETWEEN TRUNC(firstday) AND TRUNC(lastday)
+						AND id = (SELECT MAX(id) 
+								FROM terms 
+								WHERE schoolid = 160
+								AND TRUNC(SYSDATE) BETWEEN TRUNC(firstday) AND TRUNC(lastday))
+				)
+				SELECT 
+					TRIM(TO_CHAR(calendar_day.date_value, 'Day')) || ', ' || 
+					TO_CHAR(calendar_day.date_value, 'Month') || '' || 
+					TO_CHAR(calendar_day.date_value, 'DD') || 
+					CASE 
+						WHEN TO_CHAR(calendar_day.date_value, 'DD') = '01' OR 
+							TO_CHAR(calendar_day.date_value, 'DD') = '21' OR 
+							TO_CHAR(calendar_day.date_value, 'DD') = '31' THEN 'st'
+						WHEN TO_CHAR(calendar_day.date_value, 'DD') = '02' OR 
+							TO_CHAR(calendar_day.date_value, 'DD') = '22' THEN 'nd'
+						WHEN TO_CHAR(calendar_day.date_value, 'DD') = '03' OR 
+							TO_CHAR(calendar_day.date_value, 'DD') = '23' THEN 'rd'
+						ELSE 'th'
+					END as date_value
+				FROM 
+					calendar_day
+				JOIN (SELECT * FROM latest_term) latest_term
+				ON TRUNC(calendar_day.date_value) BETWEEN TRUNC(latest_term.firstday) AND TRUNC(latest_term.lastday)
+				WHERE 
+					calendar_day.schoolid = 160
+					AND calendar_day.note LIKE '%SAT%'
+    ]]>        </sql>
+    </query>
+</queries>
