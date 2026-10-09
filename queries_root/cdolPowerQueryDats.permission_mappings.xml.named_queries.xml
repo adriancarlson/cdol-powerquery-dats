@@ -1,4 +1,26 @@
 <queries>
+    <query name="net.cdolinc.custom.dats.psee.handbook_url" flattened="true" coreTable="Students" dat="true">
+        <summary>DAT - Enrollment handbook URL</summary>
+        <description>Returns the handbook URL selected by the student's enrollment PSEE_SCHOOL_ID.</description>
+        <args>
+            <arg name="coretabledcid" column="Students.DCID" required="true" />
+        </args>
+        <columns>
+            <column column="U_SCHOOL_ENROLL_SETTINGS.HANDBOOK_URL">handbook_url</column>
+        </columns>
+        <sql><![CDATA[
+            SELECT
+                TRIM(school_settings.HANDBOOK_URL) AS handbook_url
+            FROM Students student_record
+            INNER JOIN U_STUDENT_ENROLLMENT_LOGIC enrollment_logic
+                ON enrollment_logic.StudentsDCID = student_record.DCID
+            INNER JOIN Schools enrollment_school
+                ON enrollment_school.School_Number = enrollment_logic.PSEE_SCHOOL_ID
+            INNER JOIN U_SCHOOL_ENROLL_SETTINGS school_settings
+                ON school_settings.SchoolsDCID = enrollment_school.DCID
+            WHERE student_record.DCID = :coretabledcid
+        ]]></sql>
+    </query>
     <query name="net.cdolinc.custom.dats.students.contacts" flattened="true" coreTable="Students" dat="true">
         <summary>DAT - Contacts for a student</summary>
         <description>PowerQuery DAT to return all active contacts for a student, inactive contact details or end-date contact details are excluded.modified from Mike Gerszewski's one on PowerSchool Exchange</description>
