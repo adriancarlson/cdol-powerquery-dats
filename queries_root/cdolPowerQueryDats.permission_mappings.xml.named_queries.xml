@@ -1,24 +1,67 @@
 <queries>
-    <query name="net.cdolinc.custom.dats.psee.handbook_url" flattened="true" coreTable="Students" dat="true">
-        <summary>DAT - Enrollment handbook URL</summary>
-        <description>Returns the handbook URL selected by the student's enrollment PSEE_SCHOOL_ID.</description>
+<query name="net.cdolinc.custom.dats.psee.document_link" flattened="true" coreTable="Students" dat="true">
+        <summary>DAT - Enrollment document link</summary>
+        <description>Returns one named document link for the enrollment school and document type. Supports exact grade lists for grade_level and U_STUDENT_ENROLLMENT_LOGIC.PSEE_GRADE_LEVEL. Missing, ambiguous, or invalid documents return a message without a link.</description>
         <args>
             <arg name="coretabledcid" column="Students.DCID" required="true" />
+            <arg name="document_type" column="U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_TYPE" casing="lower" required="true" />
         </args>
         <columns>
-            <column column="U_SCHOOL_ENROLL_SETTINGS.HANDBOOK_URL">handbook_url</column>
+            <column column="U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL">document_link</column>
         </columns>
         <sql><![CDATA[
-            SELECT
-                TRIM(school_settings.HANDBOOK_URL) AS handbook_url
-            FROM Students student_record
-            INNER JOIN U_STUDENT_ENROLLMENT_LOGIC enrollment_logic
-                ON enrollment_logic.StudentsDCID = student_record.DCID
-            INNER JOIN Schools enrollment_school
-                ON enrollment_school.School_Number = enrollment_logic.PSEE_SCHOOL_ID
-            INNER JOIN U_SCHOOL_ENROLL_SETTINGS school_settings
-                ON school_settings.SchoolsDCID = enrollment_school.DCID
-            WHERE student_record.DCID = :coretabledcid
+            SELECT CASE
+                WHEN COUNT(U_SCHOOL_ENROLL_DOCUMENTS.ID) = 0 THEN TO_CLOB('Document unavailable. Please contact the school.')
+                WHEN COUNT(U_SCHOOL_ENROLL_DOCUMENTS.ID) > 1 THEN TO_CLOB('Multiple documents match. Please contact the school.')
+                WHEN MAX(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_NAME)) IS NULL
+                    OR NOT (
+                        LOWER(MAX(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL))) LIKE 'https' || CHR(58) || '//_%'
+                        OR LOWER(MAX(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL))) LIKE 'http' || CHR(58) || '//_%'
+                    )
+                    OR REGEXP_INSTR(MAX(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL)), '[[:space:]]') > 0
+                    OR MAX(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL)) IS NULL
+                    THEN TO_CLOB('Document unavailable. Please contact the school.')
+                ELSE TO_CLOB(CHR(60) || 'a href=' || CHR(34)) ||
+                    REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                        TO_CLOB(MAX(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL))),
+                        CHR(38), CHR(38) || 'amp;'), CHR(34), CHR(38) || 'quot;'),
+                        CHR(39), CHR(38) || '#39;'), CHR(60), CHR(38) || 'lt;'), CHR(62), CHR(38) || 'gt;') ||
+                    CHR(34) || ' target=' || CHR(34) || '_blank' || CHR(34) ||
+                    ' rel=' || CHR(34) || 'noopener noreferrer' || CHR(34) || CHR(62) ||
+                    REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                        TO_CLOB(MAX(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_NAME))),
+                        CHR(38), CHR(38) || 'amp;'), CHR(34), CHR(38) || 'quot;'),
+                        CHR(39), CHR(38) || '#39;'), CHR(60), CHR(38) || 'lt;'), CHR(62), CHR(38) || 'gt;') ||
+                    CHR(60) || '/a' || CHR(62)
+                END AS document_link
+            FROM Students
+            INNER JOIN U_STUDENT_ENROLLMENT_LOGIC
+                ON U_STUDENT_ENROLLMENT_LOGIC.StudentsDCID = Students.DCID
+            INNER JOIN Schools
+                ON Schools.School_Number = U_STUDENT_ENROLLMENT_LOGIC.PSEE_SCHOOL_ID
+            INNER JOIN U_SCHOOL_ENROLL_DOCUMENTS
+                ON U_SCHOOL_ENROLL_DOCUMENTS.SchoolsDCID = Schools.DCID
+            WHERE Students.DCID = :coretabledcid
+                AND LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_TYPE)) = LOWER(TRIM(:document_type))
+                AND (
+                    TRIM(U_SCHOOL_ENROLL_DOCUMENTS.FILTER_FIELD) IS NULL
+                    OR (
+                        LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.FILTER_FIELD)) = 'grade_level'
+                        AND Students.GRADE_LEVEL IS NOT NULL
+                        AND INSTR(
+                            ',' || REGEXP_REPLACE(U_SCHOOL_ENROLL_DOCUMENTS.FILTER_VALUE, '[[:space:]]', '') || ',',
+                            ',' || TO_CHAR(Students.GRADE_LEVEL) || ','
+                        ) > 0
+                    )
+                    OR (
+                        LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.FILTER_FIELD)) = 'u_student_enrollment_logic.psee_grade_level'
+                        AND U_STUDENT_ENROLLMENT_LOGIC.PSEE_GRADE_LEVEL IS NOT NULL
+                        AND INSTR(
+                            ',' || REGEXP_REPLACE(U_SCHOOL_ENROLL_DOCUMENTS.FILTER_VALUE, '[[:space:]]', '') || ',',
+                            ',' || TO_CHAR(U_STUDENT_ENROLLMENT_LOGIC.PSEE_GRADE_LEVEL) || ','
+                        ) > 0
+                    )
+                )
         ]]></sql>
     </query>
     <query name="net.cdolinc.custom.dats.students.contacts" flattened="true" coreTable="Students" dat="true">

@@ -1,17 +1,17 @@
 <permission_mappings>
-  <permission name='/admin/home.html'>
-    <implies allow="post">/ws/schema/query/net.cdolinc.student.sat.satdate</implies>
-  </permission>
-  <permission name="/admin/students/contacts.html">
-    <implies allow="post">/ws/schema/query/net.cdolinc.custom.dats.psee.handbook_url</implies>
+<permission name="/admin/students/contacts.html">
+    <implies allow="post">/ws/schema/query/net.cdolinc.custom.dats.psee.document_link</implies>
     <implies allow="post">/ws/schema/query/net.cdolinc.custom.dats.students.contacts</implies>
   </permission>
   <permission name="/teachers/home.html">
-    <implies allow="post">/ws/schema/query/net.cdolinc.custom.dats.psee.handbook_url</implies>
+    <implies allow="post">/ws/schema/query/net.cdolinc.custom.dats.psee.document_link</implies>
     <implies allow="post">/ws/schema/query/net.cdolinc.custom.dats.students.contacts</implies>
   </permission>
   <permission name="/guardian/home.html">
-    <implies allow="post">/ws/schema/query/net.cdolinc.custom.dats.psee.handbook_url</implies>
+    <implies allow="post">/ws/schema/query/net.cdolinc.custom.dats.psee.document_link</implies>
     <implies allow="post">/ws/schema/query/net.cdolinc.custom.dats.students.contacts</implies>
+  </permission>
+  <permission name="/admin/students/form.html">
+    <implies allow="post">/ws/schema/query/net.cdolinc.custom.dats.psee.document_link</implies>
   </permission>
 </permission_mappings>
