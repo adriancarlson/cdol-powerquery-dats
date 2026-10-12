@@ -1,7 +1,7 @@
 <queries>
 <query name="net.cdolinc.custom.dats.psee.document_link" flattened="true" coreTable="Students" dat="true">
         <summary>DAT - Enrollment document link</summary>
-        <description>Returns one named document link for the enrollment school and document type. Supports exact grade lists for grade_level and U_STUDENT_ENROLLMENT_LOGIC.PSEE_GRADE_LEVEL. Missing, ambiguous, or invalid documents return a message without a link.</description>
+        <description>Returns the English document link plus optional Spanish and Vietnamese links for the enrollment school, document type, and grade. Null or blank language is English. Missing translations add no text or parentheses. Duplicate matches within a language or invalid configured documents return a message without a link.</description>
         <args>
             <arg name="coretabledcid" column="Students.DCID" required="true" />
             <arg name="document_type" column="U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_TYPE" casing="lower" required="true" />
@@ -11,28 +11,45 @@
         </columns>
         <sql><![CDATA[
             SELECT CASE
-                WHEN COUNT(U_SCHOOL_ENROLL_DOCUMENTS.ID) = 0 THEN TO_CLOB('Document unavailable. Please contact the school.')
-                WHEN COUNT(U_SCHOOL_ENROLL_DOCUMENTS.ID) > 1 THEN TO_CLOB('Multiple documents match. Please contact the school.')
-                WHEN MAX(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_NAME)) IS NULL
-                    OR NOT (
-                        LOWER(MAX(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL))) LIKE 'https' || CHR(58) || '//_%'
-                        OR LOWER(MAX(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL))) LIKE 'http' || CHR(58) || '//_%'
-                    )
-                    OR REGEXP_INSTR(MAX(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL)), '[[:space:]]') > 0
-                    OR MAX(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL)) IS NULL
-                    THEN TO_CLOB('Document unavailable. Please contact the school.')
+                WHEN COUNT(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'en' THEN U_SCHOOL_ENROLL_DOCUMENTS.ID END) = 0 THEN TO_CLOB('Document unavailable. Please contact the school.')
+                WHEN COUNT(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'en' THEN U_SCHOOL_ENROLL_DOCUMENTS.ID END) > 1 OR COUNT(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'es' THEN U_SCHOOL_ENROLL_DOCUMENTS.ID END) > 1 OR COUNT(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'vi' THEN U_SCHOOL_ENROLL_DOCUMENTS.ID END) > 1 THEN TO_CLOB('Multiple documents match for one language. Please contact the school.')
+                WHEN COUNT(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'en' THEN U_SCHOOL_ENROLL_DOCUMENTS.ID END) > 0 AND (
+                    MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'en' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_NAME) END) IS NULL OR MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'en' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL) END) IS NULL
+                    OR NOT (LOWER(MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'en' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL) END)) LIKE 'https' || CHR(58) || '//_%'
+                        OR LOWER(MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'en' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL) END)) LIKE 'http' || CHR(58) || '//_%')
+                    OR REGEXP_INSTR(MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'en' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL) END), '[[:space:]]') > 0
+                ) THEN TO_CLOB('Document unavailable. Please contact the school.')
+                WHEN COUNT(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'es' THEN U_SCHOOL_ENROLL_DOCUMENTS.ID END) > 0 AND (
+                    MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'es' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_NAME) END) IS NULL OR MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'es' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL) END) IS NULL
+                    OR NOT (LOWER(MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'es' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL) END)) LIKE 'https' || CHR(58) || '//_%'
+                        OR LOWER(MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'es' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL) END)) LIKE 'http' || CHR(58) || '//_%')
+                    OR REGEXP_INSTR(MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'es' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL) END), '[[:space:]]') > 0
+                ) THEN TO_CLOB('Document unavailable. Please contact the school.')
+                WHEN COUNT(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'vi' THEN U_SCHOOL_ENROLL_DOCUMENTS.ID END) > 0 AND (
+                    MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'vi' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_NAME) END) IS NULL OR MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'vi' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL) END) IS NULL
+                    OR NOT (LOWER(MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'vi' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL) END)) LIKE 'https' || CHR(58) || '//_%'
+                        OR LOWER(MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'vi' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL) END)) LIKE 'http' || CHR(58) || '//_%')
+                    OR REGEXP_INSTR(MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'vi' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL) END), '[[:space:]]') > 0
+                ) THEN TO_CLOB('Document unavailable. Please contact the school.')
                 ELSE TO_CLOB(CHR(60) || 'a href=' || CHR(34)) ||
-                    REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-                        TO_CLOB(MAX(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL))),
-                        CHR(38), CHR(38) || 'amp;'), CHR(34), CHR(38) || 'quot;'),
-                        CHR(39), CHR(38) || '#39;'), CHR(60), CHR(38) || 'lt;'), CHR(62), CHR(38) || 'gt;') ||
+                    REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TO_CLOB(MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'en' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL) END)), CHR(38), CHR(38) || 'amp;'), CHR(34), CHR(38) || 'quot;'), CHR(39), CHR(38) || '#39;'), CHR(60), CHR(38) || 'lt;'), CHR(62), CHR(38) || 'gt;') ||
                     CHR(34) || ' target=' || CHR(34) || '_blank' || CHR(34) ||
                     ' rel=' || CHR(34) || 'noopener noreferrer' || CHR(34) || CHR(62) ||
-                    REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-                        TO_CLOB(MAX(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_NAME))),
-                        CHR(38), CHR(38) || 'amp;'), CHR(34), CHR(38) || 'quot;'),
-                        CHR(39), CHR(38) || '#39;'), CHR(60), CHR(38) || 'lt;'), CHR(62), CHR(38) || 'gt;') ||
-                    CHR(60) || '/a' || CHR(62)
+                    REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TO_CLOB(MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'en' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_NAME) END)), CHR(38), CHR(38) || 'amp;'), CHR(34), CHR(38) || 'quot;'), CHR(39), CHR(38) || '#39;'), CHR(60), CHR(38) || 'lt;'), CHR(62), CHR(38) || 'gt;') || CHR(60) || '/a' || CHR(62)
+                || CASE WHEN COUNT(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'es' THEN U_SCHOOL_ENROLL_DOCUMENTS.ID END) = 1 THEN
+                    TO_CLOB(' (') || TO_CLOB(CHR(60) || 'a href=' || CHR(34)) ||
+                    REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TO_CLOB(MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'es' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL) END)), CHR(38), CHR(38) || 'amp;'), CHR(34), CHR(38) || 'quot;'), CHR(39), CHR(38) || '#39;'), CHR(60), CHR(38) || 'lt;'), CHR(62), CHR(38) || 'gt;') ||
+                    CHR(34) || ' target=' || CHR(34) || '_blank' || CHR(34) ||
+                    ' rel=' || CHR(34) || 'noopener noreferrer' || CHR(34) || CHR(62) ||
+                    REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TO_CLOB(MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'es' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_NAME) END)), CHR(38), CHR(38) || 'amp;'), CHR(34), CHR(38) || 'quot;'), CHR(39), CHR(38) || '#39;'), CHR(60), CHR(38) || 'lt;'), CHR(62), CHR(38) || 'gt;') || CHR(60) || '/a' || CHR(62) || ')'
+                    ELSE TO_CLOB('') END
+                || CASE WHEN COUNT(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'vi' THEN U_SCHOOL_ENROLL_DOCUMENTS.ID END) = 1 THEN
+                    TO_CLOB(' (') || TO_CLOB(CHR(60) || 'a href=' || CHR(34)) ||
+                    REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TO_CLOB(MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'vi' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_URL) END)), CHR(38), CHR(38) || 'amp;'), CHR(34), CHR(38) || 'quot;'), CHR(39), CHR(38) || '#39;'), CHR(60), CHR(38) || 'lt;'), CHR(62), CHR(38) || 'gt;') ||
+                    CHR(34) || ' target=' || CHR(34) || '_blank' || CHR(34) ||
+                    ' rel=' || CHR(34) || 'noopener noreferrer' || CHR(34) || CHR(62) ||
+                    REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TO_CLOB(MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'vi' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_NAME) END)), CHR(38), CHR(38) || 'amp;'), CHR(34), CHR(38) || 'quot;'), CHR(39), CHR(38) || '#39;'), CHR(60), CHR(38) || 'lt;'), CHR(62), CHR(38) || 'gt;') || CHR(60) || '/a' || CHR(62) || ')'
+                    ELSE TO_CLOB('') END
                 END AS document_link
             FROM Students
             INNER JOIN U_STUDENT_ENROLLMENT_LOGIC
