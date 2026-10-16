@@ -1,7 +1,7 @@
 <queries>
 <query name="net.cdolinc.custom.dats.psee.document_link" flattened="true" coreTable="Students" dat="true">
         <summary>DAT - Enrollment document link</summary>
-        <description>Returns the English document link plus optional Spanish and Vietnamese links for the enrollment school, document type, and grade. Null or blank language is English. Missing translations add no text or parentheses. Duplicate matches within a language or invalid configured documents return a message without a link.</description>
+        <description>Returns school-specific English documents when eligible; otherwise uses All Schools documents stored under the Enrollment school, resolved by School_Number 79438. Translations come only from the selected source. School and grade filters apply before fallback; null language is English. Duplicate matches within the chosen source and language or invalid configured documents return a message without a link.</description>
         <args>
             <arg name="coretabledcid" column="Students.DCID" required="true" />
             <arg name="document_type" column="U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_TYPE" casing="lower" required="true" />
@@ -56,10 +56,38 @@
                 ON U_STUDENT_ENROLLMENT_LOGIC.StudentsDCID = Students.DCID
             INNER JOIN Schools
                 ON Schools.School_Number = U_STUDENT_ENROLLMENT_LOGIC.PSEE_SCHOOL_ID
+            LEFT JOIN Schools shared_school
+                ON shared_school.School_Number = 79438
             INNER JOIN U_SCHOOL_ENROLL_DOCUMENTS
-                ON U_SCHOOL_ENROLL_DOCUMENTS.SchoolsDCID = Schools.DCID
+                ON (U_SCHOOL_ENROLL_DOCUMENTS.SchoolsDCID = Schools.DCID OR U_SCHOOL_ENROLL_DOCUMENTS.SchoolsDCID = shared_school.DCID)
             WHERE Students.DCID = :coretabledcid
                 AND LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_TYPE)) = LOWER(TRIM(:document_type))
+                AND U_SCHOOL_ENROLL_DOCUMENTS.SchoolsDCID = NVL((
+                    SELECT MAX(school_documents.SchoolsDCID)
+                    FROM U_SCHOOL_ENROLL_DOCUMENTS school_documents
+                    WHERE school_documents.SchoolsDCID = Schools.DCID
+                        AND LOWER(TRIM(school_documents.DOCUMENT_TYPE)) = LOWER(TRIM(:document_type))
+                        AND NVL(LOWER(TRIM(school_documents.DOCUMENT_LANGUAGE)), 'en') = 'en'
+                AND (
+                    TRIM(school_documents.FILTER_FIELD) IS NULL
+                    OR (
+                        LOWER(TRIM(school_documents.FILTER_FIELD)) = 'grade_level'
+                        AND Students.GRADE_LEVEL IS NOT NULL
+                        AND INSTR(
+                            ',' || REGEXP_REPLACE(school_documents.FILTER_VALUE, '[[:space:]]', '') || ',',
+                            ',' || TO_CHAR(Students.GRADE_LEVEL) || ','
+                        ) > 0
+                    )
+                    OR (
+                        LOWER(TRIM(school_documents.FILTER_FIELD)) = 'u_student_enrollment_logic.psee_grade_level'
+                        AND U_STUDENT_ENROLLMENT_LOGIC.PSEE_GRADE_LEVEL IS NOT NULL
+                        AND INSTR(
+                            ',' || REGEXP_REPLACE(school_documents.FILTER_VALUE, '[[:space:]]', '') || ',',
+                            ',' || TO_CHAR(U_STUDENT_ENROLLMENT_LOGIC.PSEE_GRADE_LEVEL) || ','
+                        ) > 0
+                    )
+                )
+                ), shared_school.DCID)
                 AND (
                     TRIM(U_SCHOOL_ENROLL_DOCUMENTS.FILTER_FIELD) IS NULL
                     OR (

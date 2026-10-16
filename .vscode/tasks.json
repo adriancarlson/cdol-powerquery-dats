@@ -3,12 +3,21 @@
     "tasks": [
         {
             "label": "buildplugin",
-            "type": "shell",
-            "command": "py ../../pluginpack.py --with-version",
+            "type": "process",
+            "command": "py",
             "problemMatcher": [],
             "group": {
                 "kind": "build",
                 "isDefault": true
+            },
+            "args": [
+                "../../pluginpack.py",
+                "--with-version",
+                "--mask",
+                "(?i)(^|[\\\\/])tests?([\\\\/]|$)|\\.zip$"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
             }
         }
     ]
