@@ -51,16 +51,16 @@
                     REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TO_CLOB(MAX(CASE WHEN NVL(LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_LANGUAGE)), 'en') = 'vi' THEN TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_NAME) END)), CHR(38), CHR(38) || 'amp;'), CHR(34), CHR(38) || 'quot;'), CHR(39), CHR(38) || '#39;'), CHR(60), CHR(38) || 'lt;'), CHR(62), CHR(38) || 'gt;') || CHR(60) || '/a' || CHR(62) || ')'
                     ELSE TO_CLOB('') END
                 END AS document_link
-            FROM Students
-            INNER JOIN U_STUDENT_ENROLLMENT_LOGIC
-                ON U_STUDENT_ENROLLMENT_LOGIC.StudentsDCID = Students.DCID
+            FROM Students student_record
+            INNER JOIN U_STUDENT_ENROLLMENT_LOGIC enrollment_logic
+                ON enrollment_logic.StudentsDCID = student_record.DCID
             INNER JOIN Schools
-                ON Schools.School_Number = U_STUDENT_ENROLLMENT_LOGIC.PSEE_SCHOOL_ID
+                ON Schools.School_Number = enrollment_logic.PSEE_SCHOOL_ID
             LEFT JOIN Schools shared_school
                 ON shared_school.School_Number = 79438
             INNER JOIN U_SCHOOL_ENROLL_DOCUMENTS
                 ON (U_SCHOOL_ENROLL_DOCUMENTS.SchoolsDCID = Schools.DCID OR U_SCHOOL_ENROLL_DOCUMENTS.SchoolsDCID = shared_school.DCID)
-            WHERE Students.DCID = :coretabledcid
+            WHERE student_record.DCID = :coretabledcid
                 AND LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.DOCUMENT_TYPE)) = LOWER(TRIM(:document_type))
                 AND U_SCHOOL_ENROLL_DOCUMENTS.SchoolsDCID = NVL((
                     SELECT MAX(school_documents.SchoolsDCID)
@@ -72,18 +72,18 @@
                     TRIM(school_documents.FILTER_FIELD) IS NULL
                     OR (
                         LOWER(TRIM(school_documents.FILTER_FIELD)) = 'grade_level'
-                        AND Students.GRADE_LEVEL IS NOT NULL
+                        AND student_record.GRADE_LEVEL IS NOT NULL
                         AND INSTR(
                             ',' || REGEXP_REPLACE(school_documents.FILTER_VALUE, '[[:space:]]', '') || ',',
-                            ',' || TO_CHAR(Students.GRADE_LEVEL) || ','
+                            ',' || TO_CHAR(student_record.GRADE_LEVEL) || ','
                         ) > 0
                     )
                     OR (
                         LOWER(TRIM(school_documents.FILTER_FIELD)) = 'u_student_enrollment_logic.psee_grade_level'
-                        AND U_STUDENT_ENROLLMENT_LOGIC.PSEE_GRADE_LEVEL IS NOT NULL
+                        AND enrollment_logic.PSEE_GRADE_LEVEL IS NOT NULL
                         AND INSTR(
                             ',' || REGEXP_REPLACE(school_documents.FILTER_VALUE, '[[:space:]]', '') || ',',
-                            ',' || TO_CHAR(U_STUDENT_ENROLLMENT_LOGIC.PSEE_GRADE_LEVEL) || ','
+                            ',' || TO_CHAR(enrollment_logic.PSEE_GRADE_LEVEL) || ','
                         ) > 0
                     )
                 )
@@ -92,18 +92,18 @@
                     TRIM(U_SCHOOL_ENROLL_DOCUMENTS.FILTER_FIELD) IS NULL
                     OR (
                         LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.FILTER_FIELD)) = 'grade_level'
-                        AND Students.GRADE_LEVEL IS NOT NULL
+                        AND student_record.GRADE_LEVEL IS NOT NULL
                         AND INSTR(
                             ',' || REGEXP_REPLACE(U_SCHOOL_ENROLL_DOCUMENTS.FILTER_VALUE, '[[:space:]]', '') || ',',
-                            ',' || TO_CHAR(Students.GRADE_LEVEL) || ','
+                            ',' || TO_CHAR(student_record.GRADE_LEVEL) || ','
                         ) > 0
                     )
                     OR (
                         LOWER(TRIM(U_SCHOOL_ENROLL_DOCUMENTS.FILTER_FIELD)) = 'u_student_enrollment_logic.psee_grade_level'
-                        AND U_STUDENT_ENROLLMENT_LOGIC.PSEE_GRADE_LEVEL IS NOT NULL
+                        AND enrollment_logic.PSEE_GRADE_LEVEL IS NOT NULL
                         AND INSTR(
                             ',' || REGEXP_REPLACE(U_SCHOOL_ENROLL_DOCUMENTS.FILTER_VALUE, '[[:space:]]', '') || ',',
-                            ',' || TO_CHAR(U_STUDENT_ENROLLMENT_LOGIC.PSEE_GRADE_LEVEL) || ','
+                            ',' || TO_CHAR(enrollment_logic.PSEE_GRADE_LEVEL) || ','
                         ) > 0
                     )
                 )
@@ -134,6 +134,8 @@
                         case when scd.SCHOOLPICKUPFLG=1 then '✔️' else '❌' end || ' School Pickup' || incolumnsep.sep ||
                         case when scd.ISEMERGENCY=1 then '✔️' else '❌' end || ' Emergency' || incolumnsep.sep ||
                         case when scd.RECEIVESMAILFLG=1 then '✔️' else '❌' end ||' Mailings' || incolumnsep.sep
+                        || case when U_STUDENTCONTACTDETAIL_CDOL.FINANCIALLYRESPONSIBLEFLG=1 then '✔️' else '❌' end || ' Financially Responsible' || incolumnsep.sep
+                        || case when U_STUDENTCONTACTDETAIL_CDOL.SCHOOLMESSENGERFLG=1 then '✔️' else '❌' end || ' School Messenger' || incolumnsep.sep
                         flags
                     from students students
                     INNER JOIN
@@ -142,6 +144,9 @@
                         studentContactDetail scd ON sca.studentcontactassocid = scd.studentcontactassocid
                         AND scd.isactive = 1
                         AND sysdate            <= coalesce(scd.ENDDATE, sysdate)
+                    LEFT JOIN
+                        U_STUDENTCONTACTDETAIL_CDOL
+                        ON scd.studentcontactdetailid = U_STUDENTCONTACTDETAIL_CDOL.studentcstudentcontactdetailid
                     INNER JOIN
                         /*(select person.ID, person.ISACTIVE, person.FIRSTNAME, person.LASTNAME, person.PREFIXCODESETID, person.SUFFIXCODESETID, person.GENDERCODESETID from person person) p*/
                         (SELECT contactpersonid id, isactive, contactfirstname firstname, contactlastname lastname, prefixcodesetid, suffixcodesetid, gendercodesetid, studentdcid from PSSIS_STU_CONTACT_ACT psca) p
