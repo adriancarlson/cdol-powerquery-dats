@@ -134,7 +134,6 @@
                         case when scd.SCHOOLPICKUPFLG=1 then '✔️' else '❌' end || ' School Pickup' || incolumnsep.sep ||
                         case when scd.ISEMERGENCY=1 then '✔️' else '❌' end || ' Emergency' || incolumnsep.sep ||
                         case when scd.RECEIVESMAILFLG=1 then '✔️' else '❌' end ||' Mailings' || incolumnsep.sep
-                        || case when U_STUDENTCONTACTDETAIL_CDOL.FINANCIALLYRESPONSIBLEFLG=1 then '✔️' else '❌' end || ' Financially Responsible' || incolumnsep.sep
                         || case when U_STUDENTCONTACTDETAIL_CDOL.SCHOOLMESSENGERFLG=1 then '✔️' else '❌' end || ' School Messenger' || incolumnsep.sep
                         flags
                     from students students
